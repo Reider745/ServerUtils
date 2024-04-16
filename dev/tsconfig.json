@@ -1,0 +1,31 @@
+{
+	"extends": "..\\tsconfig.json",
+	"compilerOptions": {
+		"outFile": "C:\\vs\\toolchainnew\\toolchain\\toolchain\\build\\ServerUtils-b95f8\\sources\\main.js"
+	},
+	"exclude": [],
+	"include": [
+		"header.ts",
+		"api/Users.ts",
+		"api/GlobalSaves.ts",
+		"commands/translations.ts",
+		"commands/api.ts",
+		"commands/home.ts",
+		"commands/warp.ts",
+		"commands/permissions.ts",
+		"commands/money.ts",
+		"commands/spawn.ts",
+		"commands/addionaledit.ts",
+		"PopupWindow.ts",
+		"auction/constans.ts",
+		"auction/items.ts",
+		"auction/main.ts",
+		"auction/translations.ts",
+		"WorldBorder.ts",
+		"daily/api.ts",
+		"commands/blocktrack/save.ts",
+		"commands/blocktrack/handler.ts",
+		"commands/blocktrack/command.ts",
+		"shared.ts"
+	]
+}

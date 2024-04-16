@@ -1,0 +1,32 @@
+{
+	"compilerOptions": {
+		"outDir": "C:\\vs\\toolchainnew\\toolchain\\toolchain\\build\\ServerUtils-b95f8\\sources",
+		"target": "es5",
+		"lib": [
+			"esnext"
+		],
+		"module": "none",
+		"moduleDetection": "legacy",
+		"moduleResolution": "classic",
+		"skipDefaultLibCheck": true,
+		"composite": true,
+		"downlevelIteration": true,
+		"experimentalDecorators": true,
+		"noEmitOnError": true,
+		"stripInternal": true,
+		"allowJs": true
+	},
+	"compileOnSave": false,
+	"exclude": [
+		"dom",
+		"webpack"
+	],
+	"include": [],
+	"files": [
+		"C:\\vs\\toolchainnew\\toolchain\\toolchain\\declarations\\wopaapi.d.ts",
+		"C:\\vs\\toolchainnew\\ServerUtils\\declarations\\FtbQuests.d.ts",
+		"C:\\vs\\toolchainnew\\toolchain\\toolchain\\declarations\\adapted-script.d.ts",
+		"C:\\vs\\toolchainnew\\toolchain\\toolchain\\declarations\\aaadapted-script.d.ts",
+		"C:\\vs\\toolchainnew\\toolchain\\toolchain\\declarations\\preloader.d.ts"
+	]
+}

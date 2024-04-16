@@ -1,0 +1,42 @@
+{
+	"resources": [
+		{
+			"type": "gui",
+			"path": "gui"
+		}
+	],
+	"sources": [
+		{
+			"source": "dev",
+			"target": "main.js",
+			"type": "main",
+			"language": "typescript"
+		},
+		{
+			"source": "launcher.js",
+			"type": "launcher",
+			"language": "javascript"
+		}
+	],
+	"compile": [],
+	"additional": [
+		{
+			"source": "config.json",
+			"targetDir": "."
+		}
+	],
+	"info": {
+		"name": "ServerUtils",
+		"author": "Reider ___",
+		"version": "",
+		"description": "",
+		"icon": "mod_icon.png"
+	},
+	"api": "CoreEngine",
+	"linkNative": [
+		"minecraftpe",
+		"innercore",
+		"nativejs"
+	],
+	"excludeFromRelease": []
+}
