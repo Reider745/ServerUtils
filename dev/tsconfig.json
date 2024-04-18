@@ -6,10 +6,12 @@
 	"exclude": [],
 	"include": [
 		"header.ts",
+		"api/mesh_rotation.js",
 		"api/Users.ts",
-		"api/GlobalSaves.ts",
 		"commands/translations.ts",
 		"commands/api.ts",
+		"api/GlobalSaves.ts",
+		"api/WorldRenderText.ts",
 		"commands/home.ts",
 		"commands/warp.ts",
 		"commands/permissions.ts",

@@ -20,6 +20,8 @@ enum Permission {
 
     ACCESS_COMMAND,
 
+    WORLD_RENDER_TEXT_COMMAND,
+
     MAX_VALUE
 };
 

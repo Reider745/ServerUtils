@@ -50,6 +50,48 @@ function setPositionPlayer(player, x, y, z) {
     var packet = { x: x, y: y, z: z };
     client && client.send("server_utils.setPositionPlayer", packet);
 }
+var EnumHelp = /** @class */ (function () {
+    function EnumHelp(enum_obj) {
+        this.posts = [];
+        var self = this;
+        forEachEnum(enum_obj, function (name, value) { return name != "MAX_VALUE" ? self.value = Math.max(self.value, value) : 0; });
+        this.enum_obj = enum_obj;
+    }
+    EnumHelp.prototype.add = function (name) {
+        this.enum_obj[this.enum_obj[name] = this.value] = name;
+        this.value++;
+        this.enum_obj[this.enum_obj["MAX_VALUE"] = this.value] = "MAX_VALUE";
+        var value = ++this.value;
+        for (var i in this.posts) {
+            var name_1 = this.posts[i];
+            this.enum_obj[this.enum_obj[name_1] = value] = name_1;
+            value++;
+        }
+    };
+    EnumHelp.prototype.addPost = function (name) {
+        this.posts.push(name);
+    };
+    EnumHelp.prototype.get = function (name) {
+        return this.enum_obj[name];
+    };
+    return EnumHelp;
+}());
+function angleFor2dVector(x1, y1, x2, y2) {
+    var v = Math.acos((x1 * x2 + y1 * y2) / (Math.sqrt(x1 * x1 + y1 * y1) * Math.sqrt(x2 * x2 + y2 * y2)));
+    return isNaN(v) ? 0 : v;
+}
+function angleFor3dVector(x1, y1, z1, x2, y2, z2) {
+    var v = Math.acos((x1 * x2 + y1 * y2 + z1 * z2) / (Math.sqrt(x1 * x1 + y1 * y1 + z1 * z1) * Math.sqrt(x2 * x2 + y2 * y2 + z2 * z2)));
+    return isNaN(v) ? 0 : v;
+}
+function rotateMesh(mesh, x1, x2, y1, y2, dx, dy, dz, radius) {
+    var angleXZ = angleFor2dVector(0, radius, dx, dz);
+    if (dx == 0 && dz == 0)
+        var angleY = Math.PI / 2;
+    else
+        var angleY = angleFor3dVector(dx, 0, dz, dx, dy, dz);
+    mesh.rotate(0 < y2 - y1 ? -angleY : angleY, 0 < x2 - x1 ? -angleXZ : angleXZ, 0);
+}
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = function (d, b) {
         extendStatics = Object.setPrototypeOf ||
@@ -81,8 +123,8 @@ var Permission;
     Permission[Permission["REMOVE_WARP_NOT_OWNER"] = 11] = "REMOVE_WARP_NOT_OWNER";
     Permission[Permission["SPAWN_COMMAND"] = 12] = "SPAWN_COMMAND";
     Permission[Permission["ACCESS_COMMAND"] = 13] = "ACCESS_COMMAND";
-    Permission[Permission["MAX_VALUE"] = 14] = "MAX_VALUE";
-    Permission[Permission["C_LEARN"] = 15] = "C_LEARN";
+    Permission[Permission["WORLD_RENDER_TEXT_COMMAND"] = 14] = "WORLD_RENDER_TEXT_COMMAND";
+    Permission[Permission["MAX_VALUE"] = 15] = "MAX_VALUE";
 })(Permission || (Permission = {}));
 ;
 var PermissionStorage = /** @class */ (function () {
@@ -249,27 +291,6 @@ var UsersStorage = /** @class */ (function () {
     })();
     return UsersStorage;
 }());
-var GlobalSaves = /** @class */ (function () {
-    function GlobalSaves() {
-    }
-    GlobalSaves.getData = function (name) {
-        return _a.SAVES[name];
-    };
-    GlobalSaves.getDataDef = function (name, def) {
-        return _a.getData(name) || def;
-    };
-    GlobalSaves.setData = function (name, data) {
-        _a.SAVES[name] = data;
-    };
-    var _a;
-    _a = GlobalSaves;
-    GlobalSaves.SAVES = {};
-    (function () {
-        Saver.addSavesScope("server_utils.global_saves", function (scope) { return _a.SAVES = scope; }, function () { return _a.SAVES; });
-        Callback.addCallback("LevelLeft", function () { return _a.SAVES = {}; });
-    })();
-    return GlobalSaves;
-}());
 Translation.addTranslation("Error parse arguments, not found enum %v", {
     ru: "Ошибка чтения аргументов, не найдено в енуме %v"
 });
@@ -300,6 +321,9 @@ Translation.addTranslation("You are not the owner of warp %v", {
 Translation.addTranslation("You have reached the maximum number of warp or warp with the given name already exists", {
     ru: "Вы достигли лимита по warp или warp с данным именем уже есть"
 });
+Translation.addTranslation("Not found args_types", {
+    ru: "Не найден нужный args_types"
+});
 var CommandUtils = /** @class */ (function () {
     function CommandUtils() {
     }
@@ -324,10 +348,14 @@ var CommandArgType;
 })(CommandArgType || (CommandArgType = {}));
 var Command = /** @class */ (function () {
     function Command(args_types, enum_local) {
+        this.commandsArgsTypes = [];
         this.permission = Permission.MAX_VALUE;
         this.args_types = args_types;
         this.enum_local = enum_local;
     }
+    Command.prototype.addArgsTypes = function (types) {
+        this.commandsArgsTypes.push(types);
+    };
     Command.prototype.setPermissionUseCommand = function (permission) {
         this.permission = permission;
     };
@@ -351,15 +379,27 @@ var Command = /** @class */ (function () {
         args.shift();
         return args;
     };
-    Command.prototype.parseArguments = function (client, raw_args) {
-        if (this.args_types.length != raw_args.length) {
+    Command.prototype.parseArguments = function (client, raw_args, args_types) {
+        if (!args_types) {
+            if (this.args_types.length == raw_args.length)
+                args_types = this.args_types;
+            else
+                for (var i in this.commandsArgsTypes) {
+                    var types = this.commandsArgsTypes[i];
+                    if (types.length == raw_args.length) {
+                        args_types = types;
+                        break;
+                    }
+                }
+        }
+        if (!args_types || args_types.length != raw_args.length) {
             this.message(client, "Error parse arguments length args_types != raw_arfs");
             return null;
         }
         var args = [];
         for (var i in raw_args) {
             var arg = raw_args[i];
-            switch (this.args_types[i]) {
+            switch (args_types[i]) {
                 case CommandArgType.NUMBER:
                     args.push(Number(arg));
                     break;
@@ -502,6 +542,236 @@ var CommandRegistry = /** @class */ (function () {
     })();
     return CommandRegistry;
 }());
+var GlobalSaves = /** @class */ (function () {
+    function GlobalSaves() {
+    }
+    GlobalSaves.getData = function (name) {
+        return _a.SAVES[name];
+    };
+    GlobalSaves.getDataDef = function (name, def) {
+        return _a.getData(name) || def;
+    };
+    GlobalSaves.setData = function (name, data) {
+        _a.SAVES[name] = data;
+    };
+    GlobalSaves.addHandler = function (handler) {
+        this.handlers.push(handler);
+    };
+    var _a;
+    _a = GlobalSaves;
+    GlobalSaves.SAVES = {};
+    GlobalSaves.handlers = [];
+    (function () {
+        Saver.addSavesScope("server_utils.global_saves", function (scope) {
+            _a.SAVES = scope;
+            for (var i in _a.handlers)
+                _a.handlers[i].onRead();
+        }, function () {
+            for (var i in _a.handlers)
+                _a.handlers[i].onSave();
+            return _a.SAVES;
+        });
+        Callback.addCallback("LevelLeft", function () { return _a.SAVES = {}; });
+    })();
+    return GlobalSaves;
+}());
+var WorldRenderText = /** @class */ (function () {
+    function WorldRenderText(x, y, z, rx, ry, rz, dim, text, scale, color) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.rx = rx;
+        this.ry = ry;
+        this.rz = rz;
+        this.dim = dim;
+        this.text = text;
+        this.scale = scale;
+        this.color = color;
+        this.networkEntity = new NetworkEntity(_a.networkType, this);
+    }
+    WorldRenderText.buildMeshForText = function (text, scale, text_color) {
+        if (scale === void 0) { scale = 1; }
+        if (text_color === void 0) { text_color = [0, 0, 0, 0]; }
+        var mesh = new RenderMesh();
+        var def_scle = 7;
+        var h_scale = 1 * (1 / def_scle * .75) * scale;
+        var x = 0;
+        var y = 0;
+        var width = 0;
+        var height = 0;
+        mesh.setColor(text_color[0], text_color[1], text_color[2], text_color[3]);
+        mesh.setNormal(0, 0, 1);
+        for (var i = 0; i < text.length; i++) {
+            var symbol = text.charAt(i);
+            if (symbol == "\n") {
+                y -= h_scale;
+                height = Math.max(height, Math.abs(y));
+                x = 0;
+                continue;
+            }
+            else if (symbol == " ") {
+                x += this.symbols["A"].w * def_scle * scale;
+                continue;
+            }
+            var info = this.symbols[symbol];
+            if (!info)
+                continue;
+            var w_scale = info.w * def_scle * scale;
+            mesh.addVertex(x, y, 0, info.x, info.y + info.h);
+            mesh.addVertex(x + w_scale, y, 0, info.x + info.w, info.y + info.h);
+            mesh.addVertex(x, y + h_scale, 0, info.x, info.y);
+            mesh.addVertex(x + w_scale, y, 0, info.x + info.w, info.y + info.h);
+            mesh.addVertex(x, y + h_scale, 0, info.x, info.y);
+            mesh.addVertex(x + w_scale, y + h_scale, 0, info.x + info.w, info.y);
+            x += w_scale;
+            width = Math.max(width, x);
+        }
+        mesh.translate(-width / 2, height / 2, 0);
+        return { mesh: mesh, w: width, h: height };
+    };
+    WorldRenderText.prototype.remove = function () {
+        this.networkEntity.remove();
+    };
+    WorldRenderText.prototype.toJSON = function () {
+        return { x: this.x, y: this.z, z: this.z, dim: this.dim, text: this.text, scale: this.scale, rx: this.rx,
+            ry: this.ry,
+            rz: this.rz, color: this.color };
+    };
+    WorldRenderText.fromJSON = function (json) {
+        return new _a(json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
+    };
+    var _a;
+    _a = WorldRenderText;
+    WorldRenderText.symbols = FileTools.ReadJSON(__dir__ + "resources/assets/font_sprite_dump.json");
+    (function () {
+        _a.networkType = new NetworkEntityType("world_render_text");
+        _a.networkType.setClientAddPacketFactory(function (target, entity, client) {
+            return {
+                x: target.x,
+                y: target.y,
+                z: target.z,
+                rx: target.rx,
+                ry: target.ry,
+                rz: target.rz,
+                text: target.text,
+                scale: target.scale,
+                color: target.color
+            };
+        });
+        _a.networkType.setClientEntityAddedListener(function (entity, packet) {
+            var hex = android.graphics.Color.parseColor(packet.color);
+            var info = _a.buildMeshForText(packet.text, packet.scale, [
+                ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
+            ]);
+            var anim = new Animation.Base(packet.x, packet.y, packet.z);
+            rotateMesh(info.mesh, packet.x, packet.y, packet.z, packet.y + packet.ry, packet.rx, packet.ry, packet.rz, 1);
+            anim.describe({
+                mesh: info.mesh,
+                skin: "font_sprite.png"
+            });
+            anim.load();
+            return { x: packet.x, y: packet.y, z: packet.z, anim: anim };
+        });
+        _a.networkType.setClientEntityRemovedListener(function (target, entity) {
+            target.anim.destroy();
+        });
+        _a.networkType.setClientListSetupListener(function (list, target, entity) {
+            list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
+        });
+    })();
+    return WorldRenderText;
+}());
+var ServerRenderTextController = /** @class */ (function () {
+    function ServerRenderTextController(id) {
+        var _this = this;
+        this.id = id;
+        var self = this;
+        Saver.addSavesScope("server_utils.world_render_text." + id, function (scope) {
+            var renders = {};
+            for (var id_1 in scope.renders)
+                renders[id_1] = WorldRenderText.fromJSON(scope.renders[id_1]);
+            self.list = renders;
+        }, function () {
+            var renders = {};
+            for (var id_2 in _this.list)
+                renders[id_2] = _this.list[id_2].toJSON();
+            return { renders: renders };
+        });
+    }
+    ServerRenderTextController.prototype.remove = function (x, y, z, dim) {
+        for (var id in this.list) {
+            var text = this.list[id];
+            if (text.x == x && text.y == y && text.z == z && text.dim == dim) {
+                delete this.list[id];
+                return id;
+            }
+        }
+        return null;
+    };
+    ServerRenderTextController.prototype.removeId = function (id) {
+        var world = this.list[id];
+        if (world) {
+            world.remove();
+            delete this.list[id];
+            return id;
+        }
+        return null;
+    };
+    ServerRenderTextController.prototype.add = function (x, y, z, rx, ry, rz, dim, text, scale, color) {
+        if (scale === void 0) { scale = 2; }
+        if (color === void 0) { color = "#000000"; }
+        var id = String(java.util.UUID.randomUUID().toString());
+        this.removeId(id);
+        this.list[id] = new WorldRenderText(x, y, z, rx, ry, rz, dim, text, scale, color);
+        return id;
+    };
+    return ServerRenderTextController;
+}());
+var DEF_RENDER_CONTROOLER = new ServerRenderTextController("def");
+Translation.addTranslation("Added rendering text %v", {
+    ru: "Добавлен отрисовочный текст %v"
+});
+Translation.addTranslation("Removed rendering text %v", {
+    ru: "Удален отрисовочный текст %v"
+});
+Translation.addTranslation("Not found rendering text %v", {
+    ru: "Не найден отрисовочный текст %v"
+});
+var WorldRenderCommand = /** @class */ (function (_super) {
+    __extends(WorldRenderCommand, _super);
+    function WorldRenderCommand(controller) {
+        var _this = _super.call(this, [CommandArgType.STRING, CommandArgType.NUMBER]) || this; //Добавить текст
+        _this.setPermissionUseCommand(Permission.WORLD_RENDER_TEXT_COMMAND);
+        _this.addArgsTypes([CommandArgType.STRING, CommandArgType.NUMBER, CommandArgType.STRING]); //Добавить текст выбрав цвет
+        _this.addArgsTypes([CommandArgType.STRING]); //Удалить текст(нужен uuid)
+        _this.controller = controller;
+        return _this;
+    }
+    WorldRenderCommand.prototype.runServer = function (client, args) {
+        var playerUid = client.getPlayerUid();
+        if (args.length >= 2) {
+            var pos = Entity.getPosition(playerUid);
+            var vec = Entity.getLookVector(playerUid);
+            var color = "#000000";
+            if (args.length == 3)
+                color = args[2];
+            while (args[0].indexOf("\\n") != -1)
+                args[0] = args[0].replace("\\n", "\n");
+            this.message(client, "Added rendering text %v", this.controller.add(pos.x, pos.y, pos.z, vec.x, vec.y, vec.z, Entity.getDimension(playerUid), args[0], args[1], color));
+        }
+        else {
+            var id = this.controller.removeId(args[0]);
+            if (id) {
+                this.message(client, "Removed rendering text %v", id);
+                return true;
+            }
+            this.message(client, "Not found rendering text %v", args[0]);
+        }
+        return true;
+    };
+    return WorldRenderCommand;
+}(Command));
+CommandRegistry.registry("rendertext", new WorldRenderCommand(DEF_RENDER_CONTROOLER));
 var CommandSetHome = /** @class */ (function (_super) {
     __extends(CommandSetHome, _super);
     function CommandSetHome() {
@@ -645,19 +915,20 @@ var CommandPermission = /** @class */ (function (_super) {
     function CommandPermission() {
         var _this = _super.call(this, [CommandArgType.PLAYER, CommandArgType.ENUM, CommandArgType.BOOLEAN], Permission) || this;
         _this.setPermissionUseCommand(Permission.CONTROL_PERMISSION);
+        _this.addArgsTypes([CommandArgType.PLAYER]);
         return _this;
     }
     CommandPermission.prototype.runServer = function (client, args) {
         var user = UsersStorage.getUserIfCreate(args[0]);
-        if (args[1] == Permission.C_LEARN) {
-            var msg_1 = Entity.getNameTag(args[0]);
-            forEachEnum(Permission, function (name, value) { return msg_1 += "\nPermission: " + name + " = " + user.canPermission(value); });
-            this.message(client, msg_1);
+        if (args.length == 3) {
+            var v = args[2] ? 1 : 0;
+            user.setPermission(args[1], v);
+            this.message(client, "Successfully edit permission, status: %v", v);
             return true;
         }
-        var v = args[2] ? 1 : 0;
-        user.setPermission(args[1], v);
-        this.message(client, "Successfully edit permission, status: %v", v);
+        var msg = Entity.getNameTag(args[0]);
+        forEachEnum(Permission, function (name, value) { return msg += "\nPermission: " + name + " = " + user.canPermission(value); });
+        this.message(client, msg);
         return true;
     };
     return CommandPermission;
@@ -667,17 +938,21 @@ var ManyControl;
 (function (ManyControl) {
     ManyControl[ManyControl["ADD"] = 0] = "ADD";
     ManyControl[ManyControl["SET"] = 1] = "SET";
-    ManyControl[ManyControl["LEARN"] = 2] = "LEARN";
 })(ManyControl || (ManyControl = {}));
 var CommandMoney = /** @class */ (function (_super) {
     __extends(CommandMoney, _super);
     function CommandMoney() {
         var _this = _super.call(this, [CommandArgType.PLAYER, CommandArgType.ENUM, CommandArgType.NUMBER], ManyControl) || this;
         _this.setPermissionUseCommand(Permission.CONTROL_MONEY);
+        _this.addArgsTypes([CommandArgType.PLAYER]);
         return _this;
     }
     CommandMoney.prototype.runServer = function (client, args) {
         var user = UsersStorage.getUserIfCreate(args[0]);
+        if (args.length != 3) {
+            this.message(client, "User money: " + user.getMoney());
+            return true;
+        }
         switch (args[1]) {
             case ManyControl.ADD:
                 user.addMoney(args[2]);
@@ -1315,7 +1590,6 @@ var Auction = /** @class */ (function () {
                     if (typeof slot == "number" && /^\d+$/.test(price)) {
                         price = Number(price);
                         var packet = { slot: slot, price: price };
-                        alert(JSON.stringify(packet) + "  " + self_1.name);
                         Network.sendToServer("auction." + self_1.name + ".addItem", packet);
                     }
                 });
@@ -1793,11 +2067,12 @@ ModAPI.registerAPI("ServerUtils", {
     CommandUtils: CommandUtils,
     Permission: Permission,
     UsersStorage: UsersStorage,
-    GlobalSaves: GlobalSaves,
-    PopupWindow: PopupWindow,
     Auction: Auction,
     DailyQuest: DailyQuest,
     Daily: Daily,
+    GlobalSaves: GlobalSaves,
+    PopupWindow: PopupWindow,
+    EnumHelp: EnumHelp,
     requireGlobal: function (cmd) {
         return eval(cmd);
     }

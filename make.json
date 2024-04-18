@@ -3,6 +3,10 @@
 		{
 			"type": "gui",
 			"path": "gui"
+		},
+		{
+			"path": "assets",
+			"type": "resource_directory"
 		}
 	],
 	"sources": [
