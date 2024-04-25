@@ -102,45 +102,37 @@ class ClientEntity {
         this.anim.load();
     }
 }
-
-class WorldRenderText implements ServerEntity {
-    protected static networkType: NetworkEntityType;
-
-    static {
-        WorldRenderText.networkType = new NetworkEntityType("world_render_text");
-        WorldRenderText.networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client): ServerEntity => {
-            return target.toJSON();
-        });
-        WorldRenderText.networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): ClientEntity => {
-            let entity_client = new ClientEntity(entity);
-            entity_client.updateModel(packet);
-            RenderTextController.controllers[packet.controller_id].client_list[packet.id] = entity_client;
-            return entity_client;
-        });
-        WorldRenderText.networkType.setClientEntityRemovedListener((target: ClientEntity, entity) => {
-            target.anim && target.anim.destroy();
-        });
-        WorldRenderText.networkType.setClientListSetupListener((list, target: WorldRenderText, entity) => {
-            list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
-        });
-        WorldRenderText.networkType.addClientPacketListener("updateModel", (target: ClientEntity, entity, packet: ServerEntity) => {
-            target.updateModel(packet);
-        });
-        let type: any = WorldRenderText.networkType;
-        type.addServerPacketListener("sync", (target: WorldRenderText, entity, client: NetworkClient, packet: ServerEntity) => {
-            if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND)){
-                for(let key in packet)
-                    this[key] = packet[key];
-                target.updateModel()
-            }
-        });
-
-        type.addServerPacketListener("removed", (target: WorldRenderText, entity, client: NetworkClient, packet) => {
-            if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
-                RenderTextController.controllers[target.controller_id].removeId(target.id);
-        });
+const networkType: any = new NetworkEntityType("world_render_text");
+networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client): ServerEntity => {
+    return target.toJSON();
+});
+networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): ClientEntity => {
+    let entity_client = new ClientEntity(entity);
+    entity_client.updateModel(packet);
+    RenderTextController.controllers[packet.controller_id].client_list[packet.id] = entity_client;
+    return entity_client;
+});
+networkType.setClientEntityRemovedListener((target: ClientEntity, entity) => {
+    target.anim && target.anim.destroy();
+});
+networkType.setClientListSetupListener((list, target: WorldRenderText, entity) => {
+    list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
+});
+networkType.addClientPacketListener("updateModel", (target: ClientEntity, entity, packet: ServerEntity) => {
+    target.updateModel(packet);
+});
+networkType.addServerPacketListener("sync", (target: WorldRenderText, entity, client: NetworkClient, packet: ServerEntity) => {
+    if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND)){
+        for(let key in packet)
+            this[key] = packet[key];
+        target.updateModel()
     }
-
+});
+networkType.addServerPacketListener("removed", (target: WorldRenderText, entity, client: NetworkClient, packet) => {
+    if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
+        RenderTextController.controllers[target.controller_id].removeId(target.id);
+});
+class WorldRenderText implements ServerEntity {
     protected networkEntity: NetworkEntity;
     public id: string;
     public controller_id: string;
@@ -173,7 +165,7 @@ class WorldRenderText implements ServerEntity {
         this.scale = scale;
         this.color = color;
 
-        this.networkEntity = new NetworkEntity(WorldRenderText.networkType, this);
+        this.networkEntity = new NetworkEntity(networkType, this);
     }
 
     public remove(): void {
