@@ -29,4 +29,6 @@ commands/blocktrack/save.ts
 commands/blocktrack/handler.ts
 commands/blocktrack/command.ts
 
+login/login.ts
+
 shared.ts
