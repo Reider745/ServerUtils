@@ -6,28 +6,6 @@ type TextInfo = {
     h: number;
 }
 
-type PacketFactory = {
-    x: number;
-    y: number;
-    z: number;
-
-    rx: number,
-    ry: number,
-    rz: number,
-
-    text: string;
-    scale: number;
-    color: string;
-}
-
-type ClientEntity = {
-    x: number;
-    y: number;
-    z: number;
-
-    anim: Animation.Base;
-}
-
 interface ServerEntity {
     x: number;
     y: number;
@@ -41,10 +19,12 @@ interface ServerEntity {
     text: string;
     scale: number;
     color: string;
+
+    id: string,
+    controller_id: string;
 }
 
-class WorldRenderText implements ServerEntity {
-    protected static networkType: NetworkEntityType;
+class ClientEntity {
     private static symbols: {[symbol: string]: {x: number, y: number, w: number, h: number}} = FileTools.ReadJSON(__dir__+"resources/assets/font_sprite_dump.json");
 
     public static buildMeshForText(text: string, scale: number = 1, text_color: COLOR = [0, 0, 0, 0]): TextInfo {
@@ -57,7 +37,7 @@ class WorldRenderText implements ServerEntity {
         let y = 0;
 
         let width = 0;
-        let height = 0;
+        let height = h_scale;
 
         mesh.setColor(text_color[0], text_color[1], text_color[2], text_color[3]);
         mesh.setNormal(0, 0, 1);
@@ -94,46 +74,76 @@ class WorldRenderText implements ServerEntity {
         return {mesh, w: width, h: height};
     }
 
+    public anim: Animation.Base;
+    public packet: ServerEntity;
+    public entity: NetworkEntity;
+
+    constructor(entity: NetworkEntity){
+        this.entity = entity;
+    }
+
+    public updateModel(packet: ServerEntity): void {
+        this.packet = packet;
+
+        if(this.anim)
+            this.anim.destroy();
+        
+        this.anim = new Animation.Base(packet.x, packet.y, packet.z);
+
+        let hex = android.graphics.Color.parseColor(packet.color);
+        let info = ClientEntity.buildMeshForText(packet.text, packet.scale, [
+            ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
+        ]);
+        rotateMesh(info.mesh, packet.x, packet.y, packet.z, packet.y + packet.ry, packet.rx, packet.ry, packet.rz, 1);
+        this.anim.describe({
+            mesh: info.mesh,
+            skin: "font_sprite.png"
+        });
+        this.anim.load();
+    }
+}
+
+class WorldRenderText implements ServerEntity {
+    protected static networkType: NetworkEntityType;
+
     static {
-        this.networkType = new NetworkEntityType("world_render_text");
-        this.networkType.setClientAddPacketFactory((target: ServerEntity, entity, client): PacketFactory => {
-            return {
-                x: target.x,
-                y: target.y,
-                z: target.z,
-
-                rx: target.rx,
-                ry: target.ry,
-                rz: target.rz,
-
-                text: target.text,
-                scale: target.scale,
-                color: target.color
+        WorldRenderText.networkType = new NetworkEntityType("world_render_text");
+        WorldRenderText.networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client): ServerEntity => {
+            return target.toJSON();
+        });
+        WorldRenderText.networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): ClientEntity => {
+            let entity_client = new ClientEntity(entity);
+            entity_client.updateModel(packet);
+            RenderTextController.controllers[packet.controller_id].client_list[packet.id] = entity_client;
+            return entity_client;
+        });
+        WorldRenderText.networkType.setClientEntityRemovedListener((target: ClientEntity, entity) => {
+            target.anim && target.anim.destroy();
+        });
+        WorldRenderText.networkType.setClientListSetupListener((list, target: WorldRenderText, entity) => {
+            list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
+        });
+        WorldRenderText.networkType.addClientPacketListener("updateModel", (target: ClientEntity, entity, packet: ServerEntity) => {
+            target.updateModel(packet);
+        });
+        let type: any = WorldRenderText.networkType;
+        type.addServerPacketListener("sync", (target: WorldRenderText, entity, client: NetworkClient, packet: ServerEntity) => {
+            if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND)){
+                for(let key in packet)
+                    this[key] = packet[key];
+                target.updateModel()
             }
         });
-        this.networkType.setClientEntityAddedListener((entity, packet: PacketFactory): ClientEntity => {
-            let hex = android.graphics.Color.parseColor(packet.color);
-            let info = WorldRenderText.buildMeshForText(packet.text, packet.scale, [
-                ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
-            ]);
-            let anim = new Animation.Base(packet.x, packet.y, packet.z);
-            rotateMesh(info.mesh, packet.x, packet.y, packet.z, packet.y + packet.ry, packet.rx, packet.ry, packet.rz, 1);
-            anim.describe({
-                mesh: info.mesh,
-                skin: "font_sprite.png"
-            })
-            anim.load();
-            return {x: packet.x, y: packet.y, z: packet.z, anim};
-        });
-        this.networkType.setClientEntityRemovedListener((target: ClientEntity, entity) => {
-            target.anim.destroy();
-        });
-        this.networkType.setClientListSetupListener((list, target: ServerEntity, entity) => {
-            list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
+
+        type.addServerPacketListener("removed", (target: WorldRenderText, entity, client: NetworkClient, packet) => {
+            if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
+                RenderTextController.controllers[target.controller_id].removeId(target.id);
         });
     }
 
     protected networkEntity: NetworkEntity;
+    public id: string;
+    public controller_id: string;
     public x: number;
     public y: number;
     public z: number;
@@ -147,8 +157,9 @@ class WorldRenderText implements ServerEntity {
     public scale: number;
     public color: string;
 
-
-    constructor(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string, scale: number, color: string){
+    constructor(controller_id: string, id: string, x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string, scale: number, color: string){
+        this.id = id;
+        this.controller_id = controller_id;
         this.x = x;
         this.y = y;
         this.z = z;
@@ -169,15 +180,19 @@ class WorldRenderText implements ServerEntity {
         this.networkEntity.remove();
     }
 
+    public updateModel(): void {
+        this.networkEntity.send("updateModel", this.toJSON());
+    }
+
     public toJSON(): ServerEntity {
-        return {x: this.x, y: this.z, z: this.z, dim: this.dim, text: this.text, scale: this.scale, rx: this.rx,
+        return {x: this.x, y: this.y, z: this.z, dim: this.dim, text: this.text, scale: this.scale, rx: this.rx,
             ry: this.ry,
-            rz: this.rz, color: this.color};
+            rz: this.rz, color: this.color, id: this.id, controller_id: this.controller_id};
     }
 
 
     public static fromJSON(json: ServerEntity): WorldRenderText {
-        return new WorldRenderText(json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
+        return new WorldRenderText(json.controller_id, json.id, json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
     }
 }
 
@@ -185,25 +200,36 @@ type WorldRenderTextScope = {
     renders: {[id: string]: ServerEntity};
 };
 
-class ServerRenderTextController {
-    private list: {[id: string]: WorldRenderText};
+class RenderTextController {
+    public static controllers: {[id: string]: RenderTextController} = {};
 
+    private list: {[id: number]: WorldRenderText} = {};
+    public client_list: {[id: number]: ClientEntity} = {};
     protected id: string;
+
     constructor(id: string){
         this.id = id;
 
+        RenderTextController.controllers[id] = this;
+
         let self = this;
+        //: - доп защита от кривового рино
         Saver.addSavesScope("server_utils.world_render_text."+id, (scope: WorldRenderTextScope) => {
+            scope.renders = scope.renders || {};
+            self.client_list = {};
+
             let renders: {[id: string]: WorldRenderText} = {};
-            for(let id in scope.renders)
+            for(let id in scope.renders){
                 renders[id] = WorldRenderText.fromJSON(scope.renders[id]);
+            }
+
             self.list = renders;
         }, (): WorldRenderTextScope => {
             let renders: {[id: string]: ServerEntity} = {};
             for(let id in this.list)
                 renders[id] = this.list[id].toJSON();
             return {renders};
-        })
+        });
     }
 
     public remove(x: number, y: number, z: number, dim: number): string {
@@ -228,15 +254,90 @@ class ServerRenderTextController {
         return null;
     }
 
+    protected genId(): string {
+        for(var count = 0;this.list[count];count++){}
+        return ":"+count;
+    }
+
     public add(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string, scale: number = 2, color: string = "#000000"): string {
-        let id = String(java.util.UUID.randomUUID().toString());
+        let id = this.genId();
         this.removeId(id);
-        this.list[id] = new WorldRenderText(x, y, z, rx, ry, rz, dim, text, scale, color);
+        this.list[id] = new WorldRenderText(this.id, id, x, y, z, rx, ry, rz, dim, text, scale, color);
         return id;
+    }
+
+
+    public openSettingsClient(): void {
+        let dialog = PopupWindow.newDefaultStyle("Edit render text");
+
+        for(let key in this.client_list){
+            let entity = this.client_list[key];
+            let packet = entity.packet;
+            
+            dialog.add(
+                new Setting.SettingButtonTextElement(String(packet.id))
+                    .setClick((dialog) => {
+                        dialog.close();
+
+                        let edit_dialog = PopupWindow.newDefaultStyle("Edit "+packet.id);
+                        
+                        edit_dialog.add(new Setting.SettingTextElement("X"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("x", -5, 5, .1, 0));
+                        edit_dialog.add(new Setting.SettingTextElement("Y"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("y", -5, 5, .1, 0));
+                        edit_dialog.add(new Setting.SettingTextElement("Z"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("z", -5, 5, .1, 0));
+
+                        edit_dialog.add(new Setting.SettingTextElement("RX"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("rx", -5, 5, .1, 0));
+                        edit_dialog.add(new Setting.SettingTextElement("RY"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("ry", -5, 5, .1, 0));
+                        edit_dialog.add(new Setting.SettingTextElement("RZ"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("rz", -5, 5, .1, 0));
+
+                        
+                        edit_dialog.add(new Setting.SettingTextElement("scale"));
+                        edit_dialog.add(new Setting.SettingNumbersElement("scale", -5, 5, 1, 0));
+
+                        edit_dialog.add(new Setting.SettingKeyboardElement(packet.text, "text"));
+
+                        edit_dialog.add(new Setting.SettingButtonTextElement("Syncronized server")
+                            .setClick(() => entity.entity.send("sync", packet)));
+
+                        edit_dialog.add(new Setting.SettingButtonTextElement("Removed")
+                            .setClick(() => {
+                                entity.entity.send("removed", {});
+                                edit_dialog.close();
+                            })
+                        );
+
+                        edit_dialog.setEnableExitButton(true);
+                        edit_dialog.setCloseHandler((self) => {
+                            packet.x += self.configs.x;
+                            packet.y += self.configs.y;
+                            packet.z += self.configs.z;
+
+                            packet.rx += self.configs.rx;
+                            packet.ry += self.configs.ry;
+                            packet.rz += self.configs.rz;
+
+                            packet.scale += self.configs.scale;
+
+                            packet.text = self.configs.text;
+
+                            //preview
+                            entity.updateModel(packet);
+                        });
+                        edit_dialog.openCenter();
+                    })
+            );
+        }
+
+        dialog.openCenter();
     }
 }
 
-let DEF_RENDER_CONTROOLER = new ServerRenderTextController("def");
+let DEF_RENDER_CONTROOLER = new RenderTextController("def");
 
 Translation.addTranslation("Added rendering text %v", {
     ru: "Добавлен отрисовочный текст %v"
@@ -251,9 +352,9 @@ Translation.addTranslation("Not found rendering text %v", {
 });
 
 class WorldRenderCommand extends Command {
-    protected controller: ServerRenderTextController;
+    protected controller: RenderTextController;
 
-    constructor(controller: ServerRenderTextController){
+    constructor(controller: RenderTextController){
         super([CommandArgType.STRING, CommandArgType.NUMBER]);//Добавить текст
 
         this.setPermissionUseCommand(Permission.WORLD_RENDER_TEXT_COMMAND);
@@ -263,7 +364,7 @@ class WorldRenderCommand extends Command {
         this.controller = controller;
     }
 
-    public runServer(client: NetworkClient, args:  [string, number, string] | [string, number] | [string]): boolean {
+    public runServer(client: NetworkClient, args:  [string, number, string] | [string, number] | [any]): boolean {
         let playerUid = client.getPlayerUid();
         if(args.length >= 2){
             let pos = Entity.getPosition(playerUid);
@@ -291,4 +392,23 @@ class WorldRenderCommand extends Command {
     }
 }
 
-CommandRegistry.registry("rendertext", new WorldRenderCommand(DEF_RENDER_CONTROOLER));
+class WorldRenderTextEditCommand extends Command {
+    private controller: RenderTextController;
+
+    constructor(controller: RenderTextController){
+        super([]);
+
+        this.setPermissionUseCommand(Permission.WORLD_RENDER_TEXT_COMMAND);
+
+        this.controller = controller;
+    }
+
+    public runClient(raw_args: any[]): boolean {
+        this.controller.openSettingsClient();
+        Game.prevent();
+        return false;
+    }
+}
+
+CommandRegistry.registry("rt", new WorldRenderCommand(DEF_RENDER_CONTROOLER));
+CommandRegistry.registry("rte", new WorldRenderTextEditCommand(DEF_RENDER_CONTROOLER));

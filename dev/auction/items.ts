@@ -270,6 +270,7 @@ class ServerItemStorage {
         let self = this;
         Saver.addSavesScope("server_utils.auction.item_storage."+name, (scope: AuctionItemStorageJson) => {
             let items: {[uuid: string]: ServerItemAuction} = {};
+            scope.items = scope.items || {};
             for(let uuid in scope.items)
                 items[uuid] = ServerItemAuction.fromJSON(scope.items[uuid]);
             self.items = items;

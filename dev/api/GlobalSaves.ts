@@ -25,7 +25,7 @@ class GlobalSaves {
 
     static {
         Saver.addSavesScope("server_utils.global_saves", (scope) => {
-            GlobalSaves.SAVES = scope;
+            GlobalSaves.SAVES = scope || {};
             for(let i in GlobalSaves.handlers)
                 GlobalSaves.handlers[i].onRead();
         }, () => {

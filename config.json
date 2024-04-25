@@ -30,6 +30,8 @@
         "REMOVE_WARP": true,
         "REMOVE_WARP_NOT_OWNER": false,
 
-        "ACCESS_COMMAND": true
+        "ACCESS_COMMAND": true,
+
+        "WORLD_RENDER_TEXT_COMMAND": false
     }
 }
