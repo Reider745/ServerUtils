@@ -1,4 +1,4 @@
-enum LoginStatus {
+/*enum LoginStatus {
     waiting,
     register,
     successfully
@@ -152,6 +152,14 @@ namespace Login {
                     break;
             }
 
+        }
+    }
+
+    Callback.addCallback("tick", () => tickWating());
+    Callback.addCallback("ServerPlayerLoaded", (player) => addWating(player));
+    Callback.addCallback("ServerPlayerLeft", (player) => addWating(player));
+}*/
+
             /*const pos = pre_pos[player];
             if(pos)
                 Entity.setPosition(player, pos.x, pos.y, pos.z);
@@ -161,10 +169,3 @@ namespace Login {
             if(look)
                 Entity.setLookAngle(player, look.yaw, look.pitch);
             pre_look[player] = Entity.getLookAngle(player);*/
-        }
-    }
-
-    Callback.addCallback("tick", () => tickWating());
-    Callback.addCallback("ServerPlayerLoaded", (player) => addWating(player));
-    Callback.addCallback("ServerPlayerLeft", (player) => addWating(player));
-}

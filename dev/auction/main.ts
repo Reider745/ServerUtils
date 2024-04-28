@@ -358,6 +358,8 @@ class Auction {
 let SkyFactoryAction = new Auction("global")
     .setSlotSize(75);
 
-Callback.addCallback("ItemUse", (coords, item, block, is, player) => {
-    item.id == VanillaItemID.book && SkyFactoryAction.open(player)
+Callback.addCallback("ItemUse", (coords, item, block, is, player) => item.id == VanillaItemID.book && SkyFactoryAction.open(player));
+
+Callback.addCallback("OpenAuction", (player) => {
+    SkyFactoryAction.open(player)
 });

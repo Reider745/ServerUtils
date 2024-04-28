@@ -7,6 +7,7 @@ type TextInfo = {
 }
 
 interface ServerEntity {
+    type: string;
     x: number;
     y: number;
     z: number;
@@ -90,10 +91,13 @@ class ClientEntity {
         
         this.anim = new Animation.Base(packet.x, packet.y, packet.z);
 
-        let hex = android.graphics.Color.parseColor(packet.color);
-        let info = ClientEntity.buildMeshForText(packet.text, packet.scale, [
-            ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
-        ]);
+        if(packet.color){
+            let hex = android.graphics.Color.parseColor(packet.color);
+            var info = ClientEntity.buildMeshForText(packet.text, packet.scale, [
+                ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
+            ]);
+        }else
+            var info = ClientEntity.buildMeshForText(packet.text, packet.scale);
         rotateMesh(info.mesh, packet.x, packet.y, packet.z, packet.y + packet.ry, packet.rx, packet.ry, packet.rz, 1);
         this.anim.describe({
             mesh: info.mesh,
@@ -102,9 +106,10 @@ class ClientEntity {
         this.anim.load();
     }
 }
+
 const networkType: any = new NetworkEntityType("world_render_text");
-networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client): ServerEntity => {
-    return target.toJSON();
+networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client: NetworkClient): ServerEntity => {
+    return target.toJSON(client.getPlayerUid());
 });
 networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): ClientEntity => {
     let entity_client = new ClientEntity(entity);
@@ -113,7 +118,7 @@ networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): Cl
     return entity_client;
 });
 networkType.setClientEntityRemovedListener((target: ClientEntity, entity) => {
-    target.anim && target.anim.destroy();
+    target && target.anim && target.anim.destroy();
 });
 networkType.setClientListSetupListener((list, target: WorldRenderText, entity) => {
     list.setupDistancePolicy(target.x, target.y, target.z, target.dim, 64);
@@ -132,6 +137,7 @@ networkType.addServerPacketListener("removed", (target: WorldRenderText, entity,
     if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
         RenderTextController.controllers[target.controller_id].removeId(target.id);
 });
+
 class WorldRenderText implements ServerEntity {
     protected networkEntity: NetworkEntity;
     public id: string;
@@ -148,10 +154,9 @@ class WorldRenderText implements ServerEntity {
     public text: string;
     public scale: number;
     public color: string;
+    public type: string = "DEF";
 
-    constructor(controller_id: string, id: string, x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string, scale: number, color: string){
-        this.id = id;
-        this.controller_id = controller_id;
+    constructor(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string = "", scale: number = 2, color: string = undefined){
         this.x = x;
         this.y = y;
         this.z = z;
@@ -164,8 +169,22 @@ class WorldRenderText implements ServerEntity {
         this.text = text;
         this.scale = scale;
         this.color = color;
+    }
+
+    public genId(controller: RenderTextController): string {
+        return controller.genId();
+    }
+
+    public init(controller_id: string, id: string): WorldRenderText {
+        this.id = id;
+        this.controller_id = controller_id;
 
         this.networkEntity = new NetworkEntity(networkType, this);
+        return this;
+    }
+
+    public getText(player: Nullable<number>): string {
+        return this.text;
     }
 
     public remove(): void {
@@ -173,18 +192,34 @@ class WorldRenderText implements ServerEntity {
     }
 
     public updateModel(): void {
-        this.networkEntity.send("updateModel", this.toJSON());
+        let it = this.networkEntity.getClients().iterator();
+        let entity: any = this.networkEntity;
+        while(it.hasNext()){
+            let client = it.next();
+
+            entity.send(client, "updateModel", this.toJSON(client.getPlayerUid()));
+        }
     }
 
-    public toJSON(): ServerEntity {
-        return {x: this.x, y: this.y, z: this.z, dim: this.dim, text: this.text, scale: this.scale, rx: this.rx,
+    public getType(): string {
+        return this.type;
+    }
+
+    public toJSON(player: number): ServerEntity {
+        return {x: this.x, y: this.y, z: this.z, dim: this.dim, text: this.getText(player), scale: this.scale, rx: this.rx,
             ry: this.ry,
-            rz: this.rz, color: this.color, id: this.id, controller_id: this.controller_id};
+            rz: this.rz, color: this.color, id: this.id, controller_id: this.controller_id, type: this.getType()};
     }
 
+    private static TYPES: {[type: string]: typeof WorldRenderText} = {};
 
     public static fromJSON(json: ServerEntity): WorldRenderText {
-        return new WorldRenderText(json.controller_id, json.id, json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
+        return new this.TYPES[json.type](json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color)
+            .init(json.controller_id, json.id);
+    }
+
+    public static register(type: string, clazz: typeof WorldRenderText): void {
+        this.TYPES[type] = clazz;
     }
 }
 
@@ -219,7 +254,7 @@ class RenderTextController {
         }, (): WorldRenderTextScope => {
             let renders: {[id: string]: ServerEntity} = {};
             for(let id in this.list)
-                renders[id] = this.list[id].toJSON();
+                renders[id] = this.list[id].toJSON(null);
             return {renders};
         });
     }
@@ -246,15 +281,27 @@ class RenderTextController {
         return null;
     }
 
-    protected genId(): string {
+    public genId(): string {
         for(var count = 0;this.list[count];count++){}
         return ":"+count;
     }
 
-    public add(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string, scale: number = 2, color: string = "#000000"): string {
-        let id = this.genId();
+    public add(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text?: string, scale?: number, color?: string, clazz: typeof WorldRenderText = WorldRenderText): string {
+        let instance = new clazz(x, y, z, rx, ry, rz, dim, text, scale, color);
+        let id = instance.genId(this);
+        return this.addInstance(instance, id);
+    }
+
+    public addForPlayer(playerUid: number, clazz: typeof WorldRenderText, text?: string, scale?: number, color?: string): string {
+        const pos = Entity.getPosition(playerUid);
+        const vec = Entity.getLookVector(playerUid);
+
+        return this.add(pos.x, pos.y, pos.z, vec.x, vec.y, vec.z, Entity.getDimension(playerUid), text, scale, color, clazz);
+    }
+
+    public addInstance(renderText: WorldRenderText, id: string = renderText.genId(this)): string {
         this.removeId(id);
-        this.list[id] = new WorldRenderText(this.id, id, x, y, z, rx, ry, rz, dim, text, scale, color);
+        this.list[id] = renderText.init(this.id, id);
         return id;
     }
 
@@ -359,8 +406,6 @@ class WorldRenderCommand extends Command {
     public runServer(client: NetworkClient, args:  [string, number, string] | [string, number] | [any]): boolean {
         let playerUid = client.getPlayerUid();
         if(args.length >= 2){
-            let pos = Entity.getPosition(playerUid);
-            let vec = Entity.getLookVector(playerUid);
             let color = "#000000";
 
             if(args.length == 3)
@@ -368,7 +413,7 @@ class WorldRenderCommand extends Command {
             while(args[0].indexOf("\\n") != -1)
                 args[0] = args[0].replace("\\n", "\n");
             this.message(client, "Added rendering text %v", 
-                this.controller.add(pos.x, pos.y, pos.z, vec.x, vec.y, vec.z, Entity.getDimension(playerUid), args[0], args[1], color)
+                this.controller.addForPlayer(playerUid, WorldRenderText, args[0], args[1], color)
             );
         }else{
             let id = this.controller.removeId(args[0]);

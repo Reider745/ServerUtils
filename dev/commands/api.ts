@@ -52,7 +52,7 @@ class Command {
             if(symbol == " " && !str)
                 args.push("");
 
-            if(symbol == "\""){
+            if(symbol == "\"" || symbol == "'"){
                 str = !str;
                 continue;
             }
@@ -204,16 +204,24 @@ class CommandGetAccess extends Command {
 class CommandRegistry {
     private static commands: {[command: string]: Command} = {};
 
+    private static runServer(command: Command, client: NetworkClient, packet: PacketUseCommand){
+        if(packet.raw_args && command.canUseCommnad(client.getPlayerUid())){
+            let args = command.parseArguments(client, packet.raw_args);
+            if(args && !command.runServer(client, args)){
+                command.message(client, "Error run command");
+                return false;
+            } 
+            return true;
+        }else
+            command.message(client, "Not permission use command");
+        return false;
+    }
+
     public static registry(name: string, command: Command): void {
         this.commands["/"+name] = command;
 
-        Network.addServerPacket("server_utils.command.use_command."+name, (client, packet: PacketUseCommand) => {
-            if(packet.raw_args && command.canUseCommnad(client.getPlayerUid())){
-                let args = command.parseArguments(client, packet.raw_args);
-                args && !command.runServer(client, args) && command.message(client, "Error run command");
-            }else
-                command.message(client, "Not permission use command");
-        });
+        Network.addServerPacket("server_utils.command.use_command."+name, (client, packet: PacketUseCommand) => 
+            CommandRegistry.runServer(command, client, packet));
     }
 
      
@@ -224,13 +232,13 @@ class CommandRegistry {
         CommandRegistry.registry("h", cmd);
 
         Callback.addCallback("NativeCommand", function(cmd) {
-            let name = cmd.split(" ")[0];
-            let command = CommandRegistry.commands[name];
+            const name = cmd.split(" ")[0];
+            const command = CommandRegistry.commands[name];
             if(command){
-                let raw_args = command.splitCommand(cmd);
+                const raw_args = command.splitCommand(cmd);
 
-                let packet: PacketUseCommand = {raw_args};
-                let args = command.parseArguments(null, raw_args);
+                const packet: PacketUseCommand = {raw_args};
+                const args = command.parseArguments(null, raw_args);
                 
                 if(args && command.runClient(args)){
                     Network.sendToServer("server_utils.command.use_command."+name.replace("/", ""), packet);
@@ -239,4 +247,29 @@ class CommandRegistry {
             }
         });
     }
+
+    public static runServerCommandForPlayer(client: NetworkClient, cmd: string): boolean{
+        const command = CommandRegistry.commands[cmd.split(" ")[0]];
+        if(command){
+            const raw_args = command.splitCommand(cmd);
+            const packet: PacketUseCommand = {raw_args};
+
+            return CommandRegistry.runServer(command, client, packet);
+        }
+        return false;
+    }
 }
+//example
+/*
+class TestCommand extends Command {
+    constructor(){
+        super([]);
+    }
+
+    public runServer(client: NetworkClient, args: any[]): boolean {
+        return CommandRegistry.runServerCommandForPlayer(client, "/rt 'Жопа негра' 16",);
+    }
+}
+
+CommandRegistry.registry("test", new TestCommand());
+*/

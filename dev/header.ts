@@ -1,3 +1,7 @@
+try{
+    __config__.checkAndRestore(FileTools.ReadText(__dir__+"config.json"));
+}catch(e){}
+
 function forEachEnum(anum_: any, func: (name: string, value: number) => void): void {
     for(let key in anum_)
         if(!/^\d+$/.test(key))

@@ -160,6 +160,7 @@ class Daily {
     }
 
     public static updateQuests(player: number): DailyQuest[] {
+        alert("updateQuests " + quests_count)
         let quests: DailyQuest[] = [];
         let random = new java.util.Random();
 
@@ -415,4 +416,47 @@ class RecipeDailyQuest extends DailyQuest {
         Daily.registerQuest(new RecipeDailyQuest(-1, 64, 50));
         Daily.registerQuest(new RecipeDailyQuest(-1, 16, 10));
     }
+
+
 }
+
+class DailyRenderText extends WorldRenderText {
+    public genId(controller: RenderTextController): string {
+        return this.getType();
+    }
+
+    public getType(): string {
+        return "daily_quests";
+    }
+
+    public getText(player: Nullable<number>): string {
+        if(player != null){
+            let message = "Quests";
+
+            const json = Daily.toJSON(player);
+            for(let i in json.quests){
+                let quest = json.quests[i];
+                if(!quest.completed)
+                    message += "\n" + translate(quest.description, quest.values);
+            }
+
+            return message;
+        }
+        return "";
+    }
+}
+
+WorldRenderText.register("daily_quests", DailyRenderText);
+
+class DailyRenderTextCommand extends Command {
+    constructor(){
+        super([]);
+    }
+
+    public runServer(client: NetworkClient, args: any[]): boolean {
+        DEF_RENDER_CONTROOLER.addForPlayer(client.getPlayerUid(), DailyRenderText);
+        return true;
+    }
+}
+
+CommandRegistry.registry("aboba", new DailyRenderTextCommand());
