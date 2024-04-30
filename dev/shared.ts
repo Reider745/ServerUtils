@@ -16,6 +16,18 @@ ModAPI.registerAPI("ServerUtils", {
     PopupWindow,
     EnumHelp,
 
+    Utils: {
+        alert_message,
+        message,
+        setPositionPlayer
+    },
+
+    PrivatePermission,
+    PrivateZoneBase,
+    PrivateZoneDimension,
+    PrivateZoneFullPos,
+    PrivatesStorage,
+
     requireGlobal(cmd){
         return eval(cmd);
     }

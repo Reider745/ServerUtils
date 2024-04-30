@@ -23,6 +23,7 @@ interface ServerEntity {
 
     id: string,
     controller_id: string;
+    client_type: string;
 }
 
 class ClientEntity {
@@ -30,7 +31,7 @@ class ClientEntity {
 
     public static buildMeshForText(text: string, scale: number = 1, text_color: COLOR = [0, 0, 0, 0]): TextInfo {
         let mesh = new RenderMesh();
-        let def_scle = 7;
+        let def_scle = 8;
 
         let h_scale = 1 * (1 / def_scle * .75) * scale;
 
@@ -83,6 +84,10 @@ class ClientEntity {
         this.entity = entity;
     }
 
+    protected getText(text: string): string {
+        return Translation.translate(text);
+    }
+
     public updateModel(packet: ServerEntity): void {
         this.packet = packet;
 
@@ -93,7 +98,7 @@ class ClientEntity {
 
         if(packet.color){
             let hex = android.graphics.Color.parseColor(packet.color);
-            var info = ClientEntity.buildMeshForText(packet.text, packet.scale, [
+            var info = ClientEntity.buildMeshForText(this.getText(packet.text), packet.scale, [
                 ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
             ]);
         }else
@@ -105,14 +110,29 @@ class ClientEntity {
         });
         this.anim.load();
     }
+
+    private static TYPES: {[type: string]: typeof ClientEntity} = {};
+
+    public static from(type: string, entity: NetworkEntity): ClientEntity {
+        let clz = ClientEntity.TYPES[type]
+        if(clz)
+            return new clz(entity);
+        return new ClientEntity(entity);
+    }
+
+    public static register(type: string, clazz: typeof ClientEntity): void {
+        this.TYPES[type] = clazz;
+    }
 }
+
+ClientEntity.register("DEF", ClientEntity);
 
 const networkType: any = new NetworkEntityType("world_render_text");
 networkType.setClientAddPacketFactory((target: WorldRenderText, entity, client: NetworkClient): ServerEntity => {
     return target.toJSON(client.getPlayerUid());
 });
 networkType.setClientEntityAddedListener((entity: any, packet: ServerEntity): ClientEntity => {
-    let entity_client = new ClientEntity(entity);
+    let entity_client = ClientEntity.from(packet.client_type, entity);
     entity_client.updateModel(packet);
     RenderTextController.controllers[packet.controller_id].client_list[packet.id] = entity_client;
     return entity_client;
@@ -129,9 +149,12 @@ networkType.addClientPacketListener("updateModel", (target: ClientEntity, entity
 networkType.addServerPacketListener("sync", (target: WorldRenderText, entity, client: NetworkClient, packet: ServerEntity) => {
     if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND)){
         for(let key in packet)
-            this[key] = packet[key];
-        target.updateModel()
-    }
+            target[key] = packet[key];
+
+        target.updateModel();
+        alert_message(client, "Успешно синхронизированно");
+    }else
+        alert_message(client, "Запрет на синхронизацию");
 });
 networkType.addServerPacketListener("removed", (target: WorldRenderText, entity, client: NetworkClient, packet) => {
     if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
@@ -154,7 +177,9 @@ class WorldRenderText implements ServerEntity {
     public text: string;
     public scale: number;
     public color: string;
+
     public type: string = "DEF";
+    public client_type: string = "DEF";
 
     constructor(x: number, y: number, z: number, rx: number, ry: number, rz: number, dim: number, text: string = "", scale: number = 2, color: string = undefined){
         this.x = x;
@@ -187,6 +212,10 @@ class WorldRenderText implements ServerEntity {
         return this.text;
     }
 
+    public getClientType(): string {
+        return this.client_type;
+    }
+
     public remove(): void {
         this.networkEntity.remove();
     }
@@ -208,7 +237,7 @@ class WorldRenderText implements ServerEntity {
     public toJSON(player: number): ServerEntity {
         return {x: this.x, y: this.y, z: this.z, dim: this.dim, text: this.getText(player), scale: this.scale, rx: this.rx,
             ry: this.ry,
-            rz: this.rz, color: this.color, id: this.id, controller_id: this.controller_id, type: this.getType()};
+            rz: this.rz, color: this.color, id: this.id, controller_id: this.controller_id, type: this.getType(), client_type: this.getClientType()};
     }
 
     private static TYPES: {[type: string]: typeof WorldRenderText} = {};
@@ -340,6 +369,8 @@ class RenderTextController {
 
                         edit_dialog.add(new Setting.SettingKeyboardElement(packet.text, "text"));
 
+                        edit_dialog.add(new Setting.SettingKeyboardElement(packet.color || "#000000", "color"));
+
                         edit_dialog.add(new Setting.SettingButtonTextElement("Syncronized server")
                             .setClick(() => entity.entity.send("sync", packet)));
 
@@ -363,6 +394,7 @@ class RenderTextController {
                             packet.scale += self.configs.scale;
 
                             packet.text = self.configs.text;
+                            packet.color = self.configs.color;
 
                             //preview
                             entity.updateModel(packet);

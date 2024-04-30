@@ -429,24 +429,34 @@ class DailyRenderText extends WorldRenderText {
         return "daily_quests";
     }
 
+    public getClientType(): string {
+        return "daily_quests";
+    }
+
     public getText(player: Nullable<number>): string {
-        if(player != null){
-            let message = "Quests";
-
-            const json = Daily.toJSON(player);
-            for(let i in json.quests){
-                let quest = json.quests[i];
-                if(!quest.completed)
-                    message += "\n" + translate(quest.description, quest.values);
-            }
-
-            return message;
-        }
+        if(player != null)
+            return JSON.stringify(Daily.toJSON(player));
         return "";
     }
 }
 
+class ClientRenderText extends ClientEntity {
+    protected getText(text: string): string {
+        let message = Translation.translate("Daily quests");
+        const json = JSON.parse(text);
+
+        for(let i in json.quests){
+            let quest = json.quests[i];
+            if(!quest.completed)
+                message += "\n" + translate(quest.description, quest.values);
+        }
+
+        return message;
+    }
+}
+
 WorldRenderText.register("daily_quests", DailyRenderText);
+ClientEntity.register("daily_quests", ClientRenderText);
 
 class DailyRenderTextCommand extends Command {
     constructor(){
