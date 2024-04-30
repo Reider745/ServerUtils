@@ -1,4 +1,4 @@
-/*class CommandSetSpawn extends Command {
+class CommandSetSpawn extends Command {
     constructor(){
         super([]);
     }
@@ -43,4 +43,4 @@ class CommandSpawn extends Command {
 }
 
 CommandRegistry.registry("setspawn", new CommandSetSpawn());
-CommandRegistry.registry("spawn", new CommandSpawn());*/
+CommandRegistry.registry("spawn", new CommandSpawn());

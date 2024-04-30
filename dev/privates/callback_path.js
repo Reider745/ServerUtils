@@ -50,6 +50,7 @@ this["Callback"] = {
         OrgCallback.invokeCallback(name, o1, o2, o3, o4, o5, o6, o7, o8, o9, o10);
     },
 };
+
 var Call = com.zhekasmirnov.innercore.api.runtime.Callback;
 function getMapCallback() {
     let field = new Call().getClass().getDeclaredField("callbacks");
@@ -65,8 +66,12 @@ for (let i in REPLACE) {
     let list = Callback.list[name];
     let arraylist = callbacks.get(name);
     if (arraylist) {
-        for (let a = 0; a < arraylist.size(); a++)
-            list.push(arraylist.get(a)["function"]);
+        for (let a = 0; a < arraylist.size(); a++){
+            let v = arraylist.get(a);
+            var field = v.getClass().getDeclaredField("function");
+            field.setAccessible(true);
+            list.push(field.get(v));
+        }
         arraylist.clear();
     }
 
