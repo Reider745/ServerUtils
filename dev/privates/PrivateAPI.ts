@@ -1,12 +1,7 @@
-enum PrivatePermission {
-    OWNER,
-    USER
-}
-
 interface PrivateZoneBaseJson {
     type: string,
     owner: string,
-    players: {[key: string]: PrivatePermission},
+    players: {[key: string]: boolean},
 }
 
 interface PrivateZoneDimensionJson extends PrivateZoneBaseJson {
@@ -25,7 +20,7 @@ interface PrivateZoneFullJson extends PrivateZoneDimensionJson {
 
 class PrivateZoneBase {
     protected owner: string;
-    protected players: {[key: string]: PrivatePermission} = {};
+    protected players: {[key: string]: boolean} = {};
 
     constructor(json: PrivateZoneBaseJson){
         this.owner = json.owner;
@@ -33,14 +28,14 @@ class PrivateZoneBase {
     }
 
     public addPermission(player: number): void {
-        this.players[UsersStorage.getUserIfCreate(player).getUserName()] = PrivatePermission.USER;
+        this.players[UsersStorage.getUserIfCreate(player).getUserName()] = true;
     }
 
     public removePermission(player: number): void {
         delete this.players[UsersStorage.getUserIfCreate(player).getUserName()];
     }
 
-    protected canPermission(player: string): Nullable<PrivatePermission> {
+    protected canPermission(player: string): boolean {
         return this.players[player];
     }
 
@@ -48,7 +43,7 @@ class PrivateZoneBase {
         return UsersStorage.getUserIfCreate(player).getUserName() === this.owner;
     }
 
-    public canDestroyBlock(player: number): boolean {
+    public canDestroyBlock(player: number, x: number, y: number, z: number): boolean {
         const user = UsersStorage.getUserIfCreate(player);
         const nickname = user.getUserName();
 
@@ -57,8 +52,8 @@ class PrivateZoneBase {
         return false;
     }
 
-    public canItemUse(player: number): boolean {
-        return this.canDestroyBlock(player);
+    public canItemUse(player: number, x: number, y: number, z: number): boolean {
+        return this.canDestroyBlock(player, x, y, z);
     }
 
     public canPoint(dimension: number, x: number, y: number, z: number): boolean {
@@ -188,23 +183,6 @@ namespace PrivatesStorage {
     register("base", PrivateZoneBase);
     register("dimension", PrivateZoneDimension);
     register("full", PrivateZoneFullPos);
-
-    Callback.addCallback("ItemUse", (coords, item, block, is, player)=> {
-        let zone = searchPrivateZone(Entity.getDimension(player), coords.x, coords.y, coords.z);
-        if(zone && !zone.canItemUse(player)){
-            Game.prevent();
-        }
-    }, 10);
-
-    Callback.addCallback("DestroyBlock", (coords, block, player) => {
-        let zone = searchPrivateZone(Entity.getDimension(player), coords.x, coords.y, coords.z);
-        if(zone && !zone.canItemUse(player)){
-            Game.prevent();
-        }
-    }, 10);
-
-
-
 
     type SAVE = {
         zones: {[id: string]: PrivateZoneBaseJson}

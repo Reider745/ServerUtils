@@ -160,7 +160,6 @@ class Daily {
     }
 
     public static updateQuests(player: number): DailyQuest[] {
-        alert("updateQuests " + quests_count)
         let quests: DailyQuest[] = [];
         let random = new java.util.Random();
 

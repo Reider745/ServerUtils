@@ -209,33 +209,48 @@ type SaveUserStorage = {
     users: {[playerUid: number]: ServerUserJson};
 }
 
-class UsersStorage {
-    private static user_storage: {[playerUid: number]: ServerUser} = {};
+namespace UsersStorage {
+    let user_storage: {[playerUid: number]: ServerUser} = {};
+    let user_storage_nicknames: {[playerUid: string]: ServerUser} = {};
 
-    public static getUserIfCreate(playerUid: number): ServerUser {
-        let user = this.user_storage[playerUid];
-        if(!user)
-            return this.user_storage[playerUid] = new ServerUser(playerUid, Entity.getNameTag(playerUid));
+    export function getUserIfCreate(playerUid: number): ServerUser {
+        let user: ServerUser = user_storage[playerUid];
+        if(!user){
+            user = new ServerUser(playerUid, Entity.getNameTag(playerUid));
+            return user_storage_nicknames[user.getUserName()] = user_storage[playerUid] = user;
+        }
         return user;
     }
 
-    static {
-        Callback.addCallback("ServerPlayerLoaded", playerUid => this.getUserIfCreate(playerUid));
-
-        Saver.addSavesScope("server_utils.user_storage", (scope: SaveUserStorage) => {
-            let users = scope.users || {};
-            let result = {};
-            for(let key in users)
-                result[key] = ServerUser.fromJSON(users[key]);
-            UsersStorage.user_storage = result;
-        }, function(): SaveUserStorage {
-            let users: {[playerUid: number]: ServerUserJson} = {};
-            for(let key in UsersStorage.user_storage)
-                users[key] = UsersStorage.user_storage[key].toJson();
-            
-            return {users};
-        });
-        
-        Callback.addCallback("LevelLeft", () => UsersStorage.user_storage = {});
+    export function getUserForName(nickname: string): Nullable<ServerUser> {
+        let user: ServerUser = user_storage_nicknames[nickname];
+        if(!user){
+            let player = CommandUtils.getPlayerByName(nickname);
+            if(player == null) return null;
+            user = UsersStorage.getUserIfCreate(player);
+            user_storage_nicknames[user.getUserName()] = user
+        }
+        return user;
     }
+
+    export function getUsers(): {[playerUid: string]: ServerUser} {
+        return user_storage_nicknames;
+    }
+
+    Callback.addCallback("ServerPlayerLoaded", playerUid => getUserIfCreate(playerUid));
+
+    Saver.addSavesScope("server_utils.user_storage", (scope: SaveUserStorage) => {
+        let users = scope.users || {};
+        let result = {};
+        for(let key in users)
+            result[key] = ServerUser.fromJSON(users[key]);
+        user_storage = result;
+    }, function(): SaveUserStorage {
+        let users: {[playerUid: number]: ServerUserJson} = {};
+        for(let key in user_storage)
+            users[key] = user_storage[key].toJson();
+        return {users};
+    });
+        
+    Callback.addCallback("LevelLeft", () => user_storage = {});
 }

@@ -22,7 +22,6 @@ ModAPI.registerAPI("ServerUtils", {
         setPositionPlayer
     },
 
-    PrivatePermission,
     PrivateZoneBase,
     PrivateZoneDimension,
     PrivateZoneFullPos,

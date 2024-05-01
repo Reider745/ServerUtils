@@ -1,7 +1,6 @@
 function prevent(x, y, z, player, name) {
-    let zone = PrivatesStorage.searchPrivateZone(Entity.getDimension(player), x, y, z)
-
-    if (zone && !zone[name](player)) {
+    let zone = PrivatesStorage.searchPrivateZone(Entity.getDimension(player), x, y, z);
+    if (zone && !zone[name](player, x, y, z)) {
         Game.prevent();
         return true;
     }
@@ -22,12 +21,12 @@ this["Callback"] = {
         _DestroyBlock: function (coords, block, player) {
             return prevent(coords.x, coords.y, coords.z, player, "canDestroyBlock");
         },
-        BreakBlock: [],
-        _BreakBlock: function (blockSource, coords, tile, isDtop, player, item) {
-            return prevent(coords.x, coords.y, coords.z, player, "canDestroyBlock");
-        },
         BuildBlock: [],
         _BuildBlock: function (coords, block, player) {
+            return prevent(coords.x, coords.y, coords.z, player, "canItemUse");
+        },
+        BreakBlock: [],
+        _BreakBlock: function (coords, tile, isDrop, player, item) {
             return prevent(coords.x, coords.y, coords.z, player, "canItemUse");
         },
     },
