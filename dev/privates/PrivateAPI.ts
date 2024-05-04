@@ -27,12 +27,12 @@ class PrivateZoneBase {
         this.players = json.players;
     }
 
-    public addPermission(player: number): void {
-        this.players[UsersStorage.getUserIfCreate(player).getUserName()] = true;
+    public addPermission(player: string): void {
+        this.players[player] = true;
     }
 
-    public removePermission(player: number): void {
-        delete this.players[UsersStorage.getUserIfCreate(player).getUserName()];
+    public removePermission(player: string): void {
+        delete this.players[player];
     }
 
     protected canPermission(player: string): boolean {
@@ -183,6 +183,14 @@ namespace PrivatesStorage {
     register("base", PrivateZoneBase);
     register("dimension", PrivateZoneDimension);
     register("full", PrivateZoneFullPos);
+
+    Callback.addCallback("CheckPrivateZone", (res: java.util.concurrent.atomic.AtomicBoolean, player: number, dimension: number, x: number, y: number, z: number, type: java.lang.String) => {
+        let zone = searchPrivateZone(dimension, x, y, z);
+        if(!zone || zone[String(type)](player, x, y, z))
+            res.set(true);
+        else
+            res.set(false);
+    });
 
     type SAVE = {
         zones: {[id: string]: PrivateZoneBaseJson}

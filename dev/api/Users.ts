@@ -233,8 +233,8 @@ namespace UsersStorage {
         return user;
     }
 
-    export function getUsers(): {[playerUid: string]: ServerUser} {
-        return user_storage_nicknames;
+    export function getUsers(): {[playerUid: number]: ServerUser} {
+        return user_storage;
     }
 
     Callback.addCallback("ServerPlayerLoaded", playerUid => getUserIfCreate(playerUid));
@@ -242,8 +242,10 @@ namespace UsersStorage {
     Saver.addSavesScope("server_utils.user_storage", (scope: SaveUserStorage) => {
         let users = scope.users || {};
         let result = {};
-        for(let key in users)
-            result[key] = ServerUser.fromJSON(users[key]);
+        for(let key in users){
+            let user = result[key] = ServerUser.fromJSON(users[key]);
+            user_storage_nicknames[user.getUserName()] = user;
+        }
         user_storage = result;
     }, function(): SaveUserStorage {
         let users: {[playerUid: number]: ServerUserJson} = {};

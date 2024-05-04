@@ -102,7 +102,7 @@ class DailyQuest {
 
     public completed(player: number): void {
         this.status = true;
-        AchievementAPI.give(player, "Daily quests", this.getDescription(), this.getIcon());
+        AchievementAPI.give(player, "Daily quests", translate(this.getDescription(), this.getValues()), this.getIcon());
         UsersStorage.getUserIfCreate(player)
             .addMoney(this.money);
     }
@@ -257,9 +257,9 @@ class DestroyBlocksQuest extends DailyQuest {
         let counts = [16, 32];
 
         this.add({id: VanillaBlockID.dirt, data: 0}, counts, 10);
-        this.add({id: VanillaBlockID.iron_ore, data: 0}, counts, 10);
+        /*this.add({id: VanillaBlockID.iron_ore, data: 0}, counts, 10);
         this.add({id: VanillaBlockID.gold_ore, data: 0}, counts, 10);
-        this.add({id: VanillaBlockID.coal_ore, data: 0}, counts, 10);
+        this.add({id: VanillaBlockID.coal_ore, data: 0}, counts, 10);*/
     }
 }
 
@@ -351,7 +351,7 @@ class AddItemAuctionQuest extends DailyQuest {
 }
 
 Translation.addTranslation("Craft %v %v/%v, reward %v", {
-    ru: "Скрафтите %v %v/%v, нагада %v"
+    ru: "Скрафтите %v %v/%v, награда %v"
 });
 
 Translation.addTranslation("Use the %v/%v workbench, %v reward", {
