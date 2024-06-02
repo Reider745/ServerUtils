@@ -186,9 +186,8 @@ namespace PrivatesStorage {
 
     Callback.addCallback("CheckPrivateZone", (res: java.util.concurrent.atomic.AtomicBoolean, player: number, dimension: number, x: number, y: number, z: number, type: java.lang.String) => {
         let zone = searchPrivateZone(dimension, x, y, z);
-        if(!zone || zone[String(type)](player, x, y, z))
-            res.set(true);
-        else
+        res.set(true);
+        if(zone && !zone[String(type)](player, x, y, z))
             res.set(false);
     });
 

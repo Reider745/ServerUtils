@@ -102,7 +102,7 @@ class ClientEntity {
                 ((hex >> 24) & 0xFF) / 256, ((hex >> 16) & 0xFF) / 256, ((hex >> 8) & 0xFF) / 256, (hex & 0xFF) / 256
             ]);
         }else
-            var info = ClientEntity.buildMeshForText(packet.text, packet.scale);
+            var info = ClientEntity.buildMeshForText(this.getText(packet.text), packet.scale);
         rotateMesh(info.mesh, packet.x, packet.y, packet.z, packet.y + packet.ry, packet.rx, packet.ry, packet.rz, 1);
         this.anim.describe({
             mesh: info.mesh,
@@ -114,14 +114,14 @@ class ClientEntity {
     private static TYPES: {[type: string]: typeof ClientEntity} = {};
 
     public static from(type: string, entity: NetworkEntity): ClientEntity {
-        let clz = ClientEntity.TYPES[type]
+        let clz = ClientEntity.TYPES[type];
         if(clz)
             return new clz(entity);
         return new ClientEntity(entity);
     }
 
     public static register(type: string, clazz: typeof ClientEntity): void {
-        this.TYPES[type] = clazz;
+        ClientEntity.TYPES[type] = clazz;
     }
 }
 
@@ -147,7 +147,7 @@ networkType.addClientPacketListener("updateModel", (target: ClientEntity, entity
     target.updateModel(packet);
 });
 networkType.addServerPacketListener("sync", (target: WorldRenderText, entity, client: NetworkClient, packet: ServerEntity) => {
-    if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND)){
+    if(UsersStorage.canPermission(client.getPlayerUid(), Permission.WORLD_RENDER_TEXT_COMMAND)){
         for(let key in packet)
             target[key] = packet[key];
 
@@ -157,8 +157,9 @@ networkType.addServerPacketListener("sync", (target: WorldRenderText, entity, cl
         alert_message(client, "Запрет на синхронизацию");
 });
 networkType.addServerPacketListener("removed", (target: WorldRenderText, entity, client: NetworkClient, packet) => {
-    if(UsersStorage.getUserIfCreate(client.getPlayerUid()).canPermission(Permission.WORLD_RENDER_TEXT_COMMAND))
+    if(UsersStorage.canPermission(client.getPlayerUid(), Permission.WORLD_RENDER_TEXT_COMMAND)){
         RenderTextController.controllers[target.controller_id].removeId(target.id);
+    }
 });
 
 class WorldRenderText implements ServerEntity {
@@ -243,8 +244,12 @@ class WorldRenderText implements ServerEntity {
     private static TYPES: {[type: string]: typeof WorldRenderText} = {};
 
     public static fromJSON(json: ServerEntity): WorldRenderText {
-        return new this.TYPES[json.type](json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color)
-            .init(json.controller_id, json.id);
+        let clz = this.TYPES[json.type];
+        if(!clz)
+            var v = new WorldRenderText(json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
+        else
+            var v = new clz(json.x, json.y, json.z, json.rx, json.ry, json.rz, json.dim, json.text, json.scale, json.color);
+        return v.init(json.controller_id, json.id);
     }
 
     public static register(type: string, clazz: typeof WorldRenderText): void {
@@ -311,7 +316,7 @@ class RenderTextController {
     }
 
     public genId(): string {
-        for(var count = 0;this.list[count];count++){}
+        for(var count = 0;this.list[":"+count];count++){}
         return ":"+count;
     }
 
@@ -377,6 +382,7 @@ class RenderTextController {
                         edit_dialog.add(new Setting.SettingButtonTextElement("Removed")
                             .setClick(() => {
                                 entity.entity.send("removed", {});
+                                delete RenderTextController.controllers[packet.controller_id].client_list[packet.id];
                                 edit_dialog.close();
                             })
                         );

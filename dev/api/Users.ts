@@ -214,12 +214,23 @@ namespace UsersStorage {
     let user_storage_nicknames: {[playerUid: string]: ServerUser} = {};
 
     export function getUserIfCreate(playerUid: number): ServerUser {
+        if(playerUid == -1){
+            let client = Network.getClientForPlayer(playerUid);
+            client && client.disconnect("What?");
+            return null;
+        }
         let user: ServerUser = user_storage[playerUid];
         if(!user){
             user = new ServerUser(playerUid, Entity.getNameTag(playerUid));
+            Logger.Log(user.getUserName(), "Create ServerUser");
             return user_storage_nicknames[user.getUserName()] = user_storage[playerUid] = user;
         }
         return user;
+    }
+
+    export function canPermission(player: number, permission: Permission): boolean {
+        let user = getUserIfCreate(player);
+        return user && user.canPermission(permission);
     }
 
     export function getUserForName(nickname: string): Nullable<ServerUser> {
@@ -243,6 +254,9 @@ namespace UsersStorage {
         let users = scope.users || {};
         let result = {};
         for(let key in users){
+            let json = users[key];
+            if(json.playerUid == -1 || String(json.user_name) == "")
+                continue;
             let user = result[key] = ServerUser.fromJSON(users[key]);
             user_storage_nicknames[user.getUserName()] = user;
         }

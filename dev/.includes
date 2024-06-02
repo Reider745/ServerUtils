@@ -32,6 +32,5 @@ commands/blocktrack/command.ts
 login/login.ts
 
 privates/PrivateAPI.ts
-privates/callback_path.js
 
 shared.ts
