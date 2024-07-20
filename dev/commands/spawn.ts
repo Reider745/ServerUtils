@@ -44,3 +44,15 @@ class CommandSpawn extends Command {
 
 CommandRegistry.registry("setspawn", new CommandSetSpawn());
 CommandRegistry.registry("spawn", new CommandSpawn());
+
+Callback.addCallback("TeleportSpawn", (nickname) => {
+    let user = UsersStorage.getUserForName(nickname);
+    let spawn: {x: number, y: number, z: number, d: number} = GlobalSaves.getData("spawn");
+
+    if(user && spawn){
+        const playerUid = user.getPlayerUid();
+        
+        setPositionPlayer(playerUid, spawn.x, spawn.y, spawn.z);
+        Dimensions.transfer(playerUid, spawn.d);
+    }
+});

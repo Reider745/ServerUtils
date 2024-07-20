@@ -132,9 +132,13 @@ class Auction {
         try{
             let user = UsersStorage.getUserIfCreate(client.getPlayerUid());
             let price = item.getPrice();
+            let owner = item.getOwner() as ServerUser;
+
+            if(user.getUserName() == owner.getUserName())
+                price = Math.ceil(price * (user.getPriviliegeValue("ransom_auction_added_item", DEF_RANSOM_ADDED) / 100 + 1));
             
             if(user.getMoney() - price >= 0){
-                let owner = item.getOwner();
+                
                 let it = item.getItem();
 
                 user.addMoney(-price);
@@ -146,6 +150,7 @@ class Auction {
                 alert_message(client, "You have successfully purchased");
 
                 this.server_list.remove(item.getUUID());
+                owner.setData("auctions_slots", Math.max(owner.getDataDef("auctions_slots", 0) - 1, 0));
 
                 Daily.handleBuy(client.getPlayerUid(), item);
 
@@ -167,12 +172,18 @@ class Auction {
         let user = UsersStorage.getUserIfCreate(playerUid);
         let actor = new PlayerActor(playerUid);
         let item = actor.getInventorySlot(slot);
+        let auctions_slots = user.getDataDef("auctions_slots", 0);
+        let max_slots = user.getPriviliegeValue("max_auction_added_item", DEF_AUCTION_SLOTS);
 
-        if(item.id != 0 && item.count > 0 && price >= 0 && user.canPermission(Permission.USE_AUCTION) && user.canPermission(Permission.ADDED_ITEM_FOR_AUCTION)){
+        if(item.id != 0 && item.count > 0 && price >= 0 && user.canPermission(Permission.USE_AUCTION) && user.canPermission(Permission.ADDED_ITEM_FOR_AUCTION) && auctions_slots < max_slots){
+            // Наценка
+            price = Math.ceil(price * (user.getPriviliegeValue("mark_up_auction_added_item", DEF_MARK_ADDED) / 100 + 1));
+            
             actor.setInventorySlot(slot, 0, 0, 0, null);
             let server_item = new ServerItemAuction(item, price, user);
 
             this.server_list.add(server_item);
+            user.setData("auctions_slots", ++auctions_slots);
             Daily.handleAddItemAuction(playerUid, server_item);
 
             this.container.closeFor(client)
@@ -305,7 +316,10 @@ class Auction {
                 dialog.setEnableExitButton(true);
 
                 let item_seleted_element = new SettingInventoryItemSelectedElement("item");
-                dialog.add(item_seleted_element)
+                dialog.add(item_seleted_element);
+                dialog.add(new Setting.SettingTextElement(
+                    translate("The margin for adding to auctions, %v%", [clientUser.getMarkUpAuctionAddedItem()])
+                ));
                 dialog.add(new Setting.SettingKeyboardElement("Price", "price"));
 
                 delete dialog.configs.item;

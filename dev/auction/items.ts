@@ -74,11 +74,21 @@ class ClientItemAuction extends ItemAuction {
     public updateInfo(user: ClientUser): void {
         this.dialog = new UiDialogSetting(this.getName());
 
-        this.dialog.add(new Setting.SettingTextElement(translate("Price: %v", [this.getPrice()])));
-        this.dialog.add(new Setting.SettingTextElement(translate("Your money: %v", [user.getMoney()])));
-        this.dialog.add(new Setting.SettingTextElement(translate("Owner: %v", [this.getOwner().getUserName()])));
+        const owner = this.getOwner();
 
-        let self = this;
+        this.dialog.add(new Setting.SettingTextElement(translate("Price: %v", [this.getPrice()])));
+        let ransom = 1;
+        if(this.getOwner().getUserName() == user.getUserName()){
+            this.dialog.add(new Setting.SettingTextElement(
+                translate("Your margin for redemption: %v%", [user.getRansomAuctionAddedItem()]))
+            );
+            ransom += user.getRansomAuctionAddedItem() / 100;
+        }
+        this.dialog.add(new Setting.SettingTextElement(translate("Your money: %v", [user.getMoney() * ransom])));
+        this.dialog.add(new Setting.SettingTextElement(translate("Owner: %v", [owner.getUserName()])));
+
+        
+        const self = this;
         this.dialog.add(new Setting.SettingButtonTextElement(translate("buy", [])).setClick((dialog) => {
             self.list_builder.buy(self);
             dialog.close();
@@ -92,8 +102,8 @@ class ClientItemAuction extends ItemAuction {
         DescriptionItemAuction.popup.open(x, y, this);
     }
 
-    public static fromJSON(json: ClientItemAuctionJson): ClientItemAuction{
-        return new ClientItemAuction(json.item, json.price, new ClientUser(json.owner, false, 0), json.uuid);
+    public static fromJSON(json: ClientItemAuctionJson): ClientItemAuction {
+        return new ClientItemAuction(json.item, json.price, new ClientUser(json.owner, false, 0, DEF_MARK_ADDED, DEF_RANSOM_ADDED), json.uuid);
     }
 }
 

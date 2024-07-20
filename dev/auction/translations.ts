@@ -17,3 +17,11 @@ Translation.addTranslation("Owner: %v", {
 Translation.addTranslation("buy", {
     ru: "Купить"
 });
+
+Translation.addTranslation("The margin for adding to auctions, %v%", {
+    ru: "Наценка на добавление на аукционы, %v%"
+});
+
+Translation.addTranslation("Your margin for redemption: %v%", {
+    ru: "Ваша наценка на выкуп: %v%"
+});

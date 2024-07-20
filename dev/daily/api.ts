@@ -46,13 +46,13 @@ if(__config__.getBool("daily.enabled")){
     })();
 
     const startMoney = Number(__config__.getInteger("daily.startMoney"));
-    const daily_reward = Number(__config__.getInteger("daily.daily_reward"));
+    // const daily_reward = Number(__config__.getInteger("daily.daily_reward"));
 
     Callback.addCallback("UpdateEntrance", (player, day, month, first, aboba) => {
         let user = UsersStorage.getUserIfCreate(player);
 
         if(first) user.setMoney(startMoney);
-        else if(!aboba) user.addMoney(daily_reward);
+        else if(!aboba) user.addMoney(user.getPriviliegeValue("daily_reward", 0));
     });
 }
 

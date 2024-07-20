@@ -1,6 +1,7 @@
 header.ts
 
 api/mesh_rotation.js
+api/Privilege.ts
 api/Users.ts
 commands/translations.ts
 commands/api.ts
@@ -28,8 +29,6 @@ daily/api.ts
 commands/blocktrack/save.ts
 commands/blocktrack/handler.ts
 commands/blocktrack/command.ts
-
-login/login.ts
 
 privates/PrivateAPI.ts
 

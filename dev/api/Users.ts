@@ -2,9 +2,6 @@ enum Permission {
     USE_AUCTION, 
     ADDED_ITEM_FOR_AUCTION,
 
-    LOW_LARGE_SALE,
-    BIG_LARGE_SALE,
-
     CONTROL_MONEY,
     CONTROL_PERMISSION,
 
@@ -65,7 +62,7 @@ class User {
     protected many: number;
 
     constructor(name: string, many: number){
-        this.user_name = name;
+        this.user_name = String(name);
         this.many = many;
     }
 
@@ -95,16 +92,24 @@ class User {
     public getPlayerUid(): number {
         return -1;
     }
+
+    public message(str: string, ...values: any[]): void {
+        Game.message(translate(str, values));
+    }
 };
 
 interface ClientUserJson extends UserJson  {
     addedAuctionItem: boolean;
+    mark_up_auction_added_item: number;
+    ransom_auction_added_item: number;
 }
 
 class ClientUser extends User {
-    private addedAuctionItem: boolean;
+    private readonly addedAuctionItem: boolean;
+    private readonly mark_up_auction_added_item: number;
+    private readonly ransom_auction_added_item: number;
 
-    constructor(user_name: string, addedAuctionItem: boolean, many: number){
+    constructor(user_name: string, addedAuctionItem: boolean, many: number, mark_up_auction_added_item: number, ransom_auction_added_item: number){
         super(user_name, many);
 
         this.addedAuctionItem = addedAuctionItem;
@@ -114,12 +119,20 @@ class ClientUser extends User {
         return this.addedAuctionItem;
     }
 
+    public getMarkUpAuctionAddedItem(): number {
+        return this.mark_up_auction_added_item;
+    }
+
+    public getRansomAuctionAddedItem(): number {
+        return this.ransom_auction_added_item;
+    }
+
     public getPlayerUid(): number {
         return Player.get();
     }
 
     public static fromJSON(json: ClientUserJson): ClientUser {
-        return new ClientUser(json.user_name, json.addedAuctionItem, json.money);
+        return new ClientUser(json.user_name, json.addedAuctionItem, json.money, json.mark_up_auction_added_item, json.ransom_auction_added_item);
     }
 }
 
@@ -127,6 +140,8 @@ interface ServerUserJson extends UserJson {
     playerUid: number;
     permissions: number[];
     addional: {[key: string]: any};
+
+    current_priviege?: string;
 }
 
 let GLOBAL_PERMISSION: PermissionStorage = (() => {
@@ -140,19 +155,34 @@ let GLOBAL_PERMISSION: PermissionStorage = (() => {
 class ServerUser extends User {
     private playerUid: number;
     private permissions: PermissionStorage;
+    private current_priviege: Priviliege;
 
     private addional: {[key: string]: any} = {};
 
-    constructor(playerUid: number, name: string, addional: {[key: string]: any} = {}, permissions?: number[], many: number = 0){
+    constructor(playerUid: number, name: string, addional: {[key: string]: any} = {}, permissions?: number[], many: number = 0, current_priviege: string = undefined){
         super(name, many);
 
         this.playerUid = playerUid;
         this.addional = addional;
         this.permissions = new PermissionStorage(permissions);
+
+        this.setPriviege(current_priviege);
+    }
+
+    public setPriviege(id: Nullable<string>): void {
+        if(id)
+            this.current_priviege = Priviliege.get(id);
+        else
+            this.current_priviege = Priviliege.get(Priviliege.DEF)
     }
 
     public getPlayerUid(): number {
         return this.playerUid;
+    }
+
+    public message(str: string, ...values: any[]): void {
+        let client = Network.getClientForPlayer(this.getPlayerUid());
+        client && message(client, str, values);
     }
 
     public isOperator(): boolean {
@@ -164,7 +194,27 @@ class ServerUser extends User {
     }
 
     public canPermission(permission: Permission): boolean {
-        return this.isOperator() || this.permissions.canPermission(permission) || GLOBAL_PERMISSION.canPermission(permission);
+        return this.isOperator() || this.current_priviege.canPermission(permission, this) || this.permissions.canPermission(permission) || GLOBAL_PERMISSION.canPermission(permission);
+    }
+
+    public getPriviliege(): Priviliege {
+        return this.current_priviege;
+    }
+
+    public getPriviliegeValue<T>(id: ID_PRIVIEGE_VALUE, def: T): T {
+        return this.current_priviege.getValueDef(id, def);
+    }
+
+    public getXp(): number {
+        return this.getDataDef("xp", 0);
+    }
+
+    public setXp(xp: number): void {
+        this.setData("xp", xp);
+    }
+
+    public addXp(xp: number): void {
+        this.setXp(this.getXp()+xp);
     }
 
     public toClientJson(): ClientUserJson {
@@ -172,7 +222,10 @@ class ServerUser extends User {
             user_name: this.getUserName(),
             money: this.getMoney(),
 
-            addedAuctionItem: this.canPermission(Permission.ADDED_ITEM_FOR_AUCTION)
+            addedAuctionItem: this.canPermission(Permission.ADDED_ITEM_FOR_AUCTION),
+
+            mark_up_auction_added_item: this.getPriviliegeValue("mark_up_auction_added_item", DEF_MARK_ADDED),
+            ransom_auction_added_item: this.getPriviliegeValue("ransom_auction_added_item", DEF_RANSOM_ADDED)
         }
     }
 
@@ -196,12 +249,22 @@ class ServerUser extends User {
 
             playerUid: this.playerUid,
             permissions: this.permissions.getPermissions(),
-            addional: this.addional
+            addional: this.addional,
+            current_priviege: this.current_priviege.getId()
         };
     }
 
     public static fromJSON(json: ServerUserJson): ServerUser {
-        return new ServerUser(json.playerUid, json.user_name, json.addional, json.permissions, json.money);
+        return new ServerUser(json.playerUid, json.user_name, json.addional, json.permissions, json.money, json.current_priviege);
+    }
+
+    static {
+        Callback.addCallback("QuestGive", (main, isLeft, tab, quest, player, value, is, result) => {
+            if(value && result){
+                let user = UsersStorage.getUserIfCreate(player);
+                user && user.addXp(user.getPriviliegeValue("guest_xp", DEF_XP));
+            }
+        });
     }
 }
 
@@ -222,7 +285,7 @@ namespace UsersStorage {
         let user: ServerUser = user_storage[playerUid];
         if(!user){
             user = new ServerUser(playerUid, Entity.getNameTag(playerUid));
-            Logger.Log(user.getUserName(), "Create ServerUser");
+            Logger.Log("Create ServerUser "+user.getUserName(), "ServerUtils");
             return user_storage_nicknames[user.getUserName()] = user_storage[playerUid] = user;
         }
         return user;
@@ -249,6 +312,7 @@ namespace UsersStorage {
     }
 
     Callback.addCallback("ServerPlayerLoaded", playerUid => getUserIfCreate(playerUid));
+    Callback.addCallback("LevelLeft", () => user_storage = {});
 
     Saver.addSavesScope("server_utils.user_storage", (scope: SaveUserStorage) => {
         let users = scope.users || {};
@@ -267,6 +331,4 @@ namespace UsersStorage {
             users[key] = user_storage[key].toJson();
         return {users};
     });
-        
-    Callback.addCallback("LevelLeft", () => user_storage = {});
 }
