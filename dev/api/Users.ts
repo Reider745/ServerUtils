@@ -19,6 +19,8 @@ enum Permission {
 
     WORLD_RENDER_TEXT_COMMAND,
 
+    AUCTION_COMMAND,
+
     MAX_VALUE
 };
 
@@ -113,6 +115,8 @@ class ClientUser extends User {
         super(user_name, many);
 
         this.addedAuctionItem = addedAuctionItem;
+        this.mark_up_auction_added_item = mark_up_auction_added_item;
+        this.ransom_auction_added_item = ransom_auction_added_item;
     }
 
     public canAddedAuctionItem(): boolean {

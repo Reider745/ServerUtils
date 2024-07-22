@@ -76,7 +76,6 @@ class ClientItemAuction extends ItemAuction {
 
         const owner = this.getOwner();
 
-        this.dialog.add(new Setting.SettingTextElement(translate("Price: %v", [this.getPrice()])));
         let ransom = 1;
         if(this.getOwner().getUserName() == user.getUserName()){
             this.dialog.add(new Setting.SettingTextElement(
@@ -84,7 +83,9 @@ class ClientItemAuction extends ItemAuction {
             );
             ransom += user.getRansomAuctionAddedItem() / 100;
         }
-        this.dialog.add(new Setting.SettingTextElement(translate("Your money: %v", [user.getMoney() * ransom])));
+
+        this.dialog.add(new Setting.SettingTextElement(translate("Price: %v", [Math.ceil(this.getPrice() * ransom)])));
+        this.dialog.add(new Setting.SettingTextElement(translate("Your money: %v", [user.getMoney()])));
         this.dialog.add(new Setting.SettingTextElement(translate("Owner: %v", [owner.getUserName()])));
 
         

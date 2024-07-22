@@ -19,6 +19,7 @@
 		"commands/money.ts",
 		"commands/spawn.ts",
 		"commands/addionaledit.ts",
+		"commands/auction.ts",
 		"PopupWindow.ts",
 		"auction/constans.ts",
 		"auction/items.ts",

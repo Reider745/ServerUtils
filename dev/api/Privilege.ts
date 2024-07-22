@@ -176,8 +176,8 @@ class VipPriviliege extends PlayerPriviliege {
             
             case Permission.CREATE_WARP:
                 return true;
-
-            case Permission.USE_WARP:
+            
+            case Permission.AUCTION_COMMAND:
                 return true;
         }
 

@@ -25,3 +25,15 @@ Translation.addTranslation("The margin for adding to auctions, %v%", {
 Translation.addTranslation("Your margin for redemption: %v%", {
     ru: "Ваша наценка на выкуп: %v%"
 });
+
+Translation.addTranslation("It is not possible to process the transaction, the transaction is being processed with another player", {
+    ru: "Обработать транзакцию невозможно, транзакция обрабатывается с другим игроком"
+});
+
+Translation.addTranslation("You have successfully purchased", {
+    ru: "Вы успешно приобрели"
+});
+
+Translation.addTranslation("Your product has been successfully purchased", {
+    ru: "Ваш продукт был успешно приобретен"
+});

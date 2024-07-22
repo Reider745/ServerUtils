@@ -133,15 +133,16 @@ class Auction {
             let user = UsersStorage.getUserIfCreate(client.getPlayerUid());
             let price = item.getPrice();
             let owner = item.getOwner() as ServerUser;
+            let price_ransom = price;
 
             if(user.getUserName() == owner.getUserName())
-                price = Math.ceil(price * (user.getPriviliegeValue("ransom_auction_added_item", DEF_RANSOM_ADDED) / 100 + 1));
+                price_ransom = Math.ceil(price * (user.getPriviliegeValue("ransom_auction_added_item", DEF_RANSOM_ADDED) / 100 + 1));
             
-            if(user.getMoney() - price >= 0){
+            if(user.getMoney() - price_ransom >= 0){
                 
                 let it = item.getItem();
 
-                user.addMoney(-price);
+                user.addMoney(-price_ransom);
                 owner.addMoney(price);
 
                 new PlayerActor(user.getPlayerUid()).addItemToInventory(it.id, it.count, it.data, it.extra||null, true);
@@ -160,7 +161,7 @@ class Auction {
                 return;
             }
         }catch(e){
-            alert_message(client, String(e))
+            alert_message(client, "Unknown error: "+String(e))
         };
 
         item.unlock();
@@ -372,7 +373,7 @@ class Auction {
 let SkyFactoryAction = new Auction("global")
     .setSlotSize(75);
 
-Callback.addCallback("ItemUse", (coords, item, block, is, player) => item.id == VanillaItemID.book && SkyFactoryAction.open(player));
+// Callback.addCallback("ItemUse", (coords, item, block, is, player) => item.id == VanillaItemID.book && SkyFactoryAction.open(player));
 
 Callback.addCallback("OpenAuction", (player) => {
     SkyFactoryAction.open(player)
